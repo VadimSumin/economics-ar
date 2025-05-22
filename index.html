@@ -13,44 +13,36 @@
     </style>
   </head>
   <body>
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
-      <!-- Текст в AR -->
-      <a-text
-        value="привет из IT Беларуси!"
-        color="white"
-        position="0 1.5 -1"
-        align="center"
-        scale="0.5 0.5 0.5"
-        rotation="0 0 0">
-      </a-text>
-      
-      <!-- Изображение в AR -->
-      <a-image
-        src="image.png"
-        position="0 0 -1"
-        rotation="0 0 0"
-        width="1"
-        height="1">
-      </a-image>
-      
-      <!-- Аудио -->
-      <a-sound
-        src="https://raw.githubusercontent.com/aframevr/aframe/master/examples/basic/audio/click.ogg"
-        autoplay="true"
-        loop="true"
-        position="0 0 0">
-      </a-sound>
-
-      <!-- Маркер для AR (QR код) -->
-      <a-marker-camera 
-        type="pattern" 
-        preset="custom" 
-        url="marker.png"
-        smooth="true" 
-        smoothCount="5" 
-        smoothTolerance="0.01" 
-        smoothThreshold="5">
-      </a-marker-camera>
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true;">
+      <!-- Маркер с вашим паттерном -->
+      <a-marker type="pattern" url="marker.patt" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="5">
+        <!-- Текст в AR -->
+        <a-text
+          value="привет из IT Беларуси!"
+          color="white"
+          position="0 1.5 0"
+          align="center"
+          scale="0.5 0.5 0.5"
+          rotation="0 0 0">
+        </a-text>
+        <!-- Изображение в AR -->
+        <a-image
+          src="image.png"
+          position="0 0 0"
+          rotation="0 0 0"
+          width="1"
+          height="1">
+        </a-image>
+        <!-- Аудио -->
+        <a-sound
+          src="https://raw.githubusercontent.com/aframevr/aframe/master/examples/basic/audio/click.ogg"
+          autoplay="true"
+          loop="true"
+          position="0 0 0">
+        </a-sound>
+      </a-marker>
+      <!-- Камера -->
+      <a-entity camera></a-entity>
     </a-scene>
   </body>
 </html> 
