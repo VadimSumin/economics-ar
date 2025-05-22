@@ -27,22 +27,50 @@
         font-size: 1.25em;
         color: white;
       }
+      #debug {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 14px;
+        z-index: 9998;
+        pointer-events: none;
+      }
     </style>
     <script>
       // Функция для скрытия загрузчика после инициализации AR
       window.onload = function() {
         const scene = document.querySelector('a-scene');
         const loader = document.querySelector('.arjs-loader');
+        const debug = document.getElementById('debug');
+        const marker = document.querySelector('a-marker');
         
         if (scene && loader) {
           scene.addEventListener('loaded', function () {
             loader.style.display = 'none';
+            debug.innerHTML += "AR сцена загружена<br>";
           });
           
           // Резервный таймер на случай, если событие loaded не сработает
           setTimeout(function() {
             loader.style.display = 'none';
           }, 3000);
+        }
+
+        // Отладка маркера
+        if (marker) {
+          marker.addEventListener('markerFound', function() {
+            debug.innerHTML += "Маркер найден!<br>";
+          });
+          
+          marker.addEventListener('markerLost', function() {
+            debug.innerHTML += "Маркер потерян<br>";
+          });
+        } else {
+          debug.innerHTML += "Маркер не инициализирован<br>";
         }
       }
     </script>
@@ -53,34 +81,36 @@
       <div>Загрузка, пожалуйста подождите...</div>
     </div>
     
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; patternRatio: 0.75;">
+    <!-- Отладочная информация -->
+    <div id="debug">Отладка AR:<br></div>
+    
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; patternRatio: 0.65; maxDetectionRate: 60;">
+      <!-- Попробуем оба варианта: кастомный маркер и стандартный Hiro -->
+      
       <!-- Кастомный маркер -->
-      <a-marker type="pattern" url="./marker.patt">
-        <!-- Текст в AR -->
+      <a-marker type="pattern" url="marker.patt" emitevents="true" id="custom-marker">
         <a-text
-          value="привет из IT Беларуси!"
-          color="white"
+          value="Кастомный маркер"
+          color="red"
           position="0 0.5 0"
           align="center"
           scale="0.5 0.5 0.5"
           rotation="-90 0 0">
         </a-text>
-        <!-- Изображение в AR -->
-        <a-image
-          src="image.png"
-          position="0 0 0"
-          rotation="-90 0 0"
-          width="1"
-          height="1">
-        </a-image>
-        <!-- Аудио -->
-        <a-sound
-          src="https://raw.githubusercontent.com/aframevr/aframe/master/examples/basic/audio/click.ogg"
-          autoplay="true"
-          loop="true"
-          position="0 0 0">
-        </a-sound>
       </a-marker>
+      
+      <!-- Стандартный маркер Hiro -->
+      <a-marker preset="hiro" emitevents="true" id="hiro-marker">
+        <a-text
+          value="Стандартный маркер"
+          color="blue"
+          position="0 0.5 0"
+          align="center"
+          scale="0.5 0.5 0.5"
+          rotation="-90 0 0">
+        </a-text>
+      </a-marker>
+      
       <!-- Камера -->
       <a-entity camera></a-entity>
     </a-scene>
