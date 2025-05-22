@@ -10,26 +10,48 @@
         margin: 0;
         overflow: hidden;
       }
+      .arjs-loader {
+        height: 100%;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .arjs-loader div {
+        text-align: center;
+        font-size: 1.25em;
+        color: white;
+      }
     </style>
   </head>
   <body>
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true;">
-      <!-- Маркер с вашим паттерном -->
-      <a-marker type="pattern" url="marker.patt" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="5">
+    <!-- Загрузчик -->
+    <div class="arjs-loader">
+      <div>Загрузка, пожалуйста подождите...</div>
+    </div>
+    
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; patternRatio: 0.75;">
+      <!-- Кастомный маркер -->
+      <a-marker type="pattern" url="./marker.patt">
         <!-- Текст в AR -->
         <a-text
           value="привет из IT Беларуси!"
           color="white"
-          position="0 1.5 0"
+          position="0 0.5 0"
           align="center"
           scale="0.5 0.5 0.5"
-          rotation="0 0 0">
+          rotation="-90 0 0">
         </a-text>
         <!-- Изображение в AR -->
         <a-image
           src="image.png"
           position="0 0 0"
-          rotation="0 0 0"
+          rotation="-90 0 0"
           width="1"
           height="1">
         </a-image>
