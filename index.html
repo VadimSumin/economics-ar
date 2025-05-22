@@ -51,6 +51,20 @@
         font-size: 12px;
         z-index: 9997;
       }
+      #stabilizing {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        display: none;
+        z-index: 9990;
+      }
     </style>
     <script>
       window.onload = function() {
@@ -58,8 +72,12 @@
         const loader = document.querySelector('.arjs-loader');
         const debug = document.getElementById('debug');
         const customMarker = document.querySelector('#custom-marker');
-        const hiroMarker = document.querySelector('#hiro-marker');
         const versionInfo = document.getElementById('version-info');
+        const stabilizing = document.getElementById('stabilizing');
+        
+        let markerVisible = false;
+        let stabilityCounter = 0;
+        const requiredStability = 10; // Сколько кадров подряд маркер должен быть виден
         
         if (navigator.userAgent) {
           versionInfo.innerHTML = "Браузер: " + navigator.userAgent;
@@ -68,8 +86,8 @@
         if (scene && loader) {
           scene.addEventListener('loaded', function () {
             loader.style.display = 'none';
-            debug.innerHTML += "AR сцена загружена<br>";
-            debug.innerHTML += "Ищите маркеры...<br>";
+            debug.innerHTML = "AR сцена загружена<br>";
+            debug.innerHTML += "Направьте камеру на маркер E-ECONOMY<br>";
           });
           
           setTimeout(function() {
@@ -77,29 +95,82 @@
           }, 3000);
         }
 
-        // Отладка маркеров
+        // Функция для сглаженного включения/выключения AR контента
+        function toggleARContent(isVisible) {
+          const arContent = document.querySelectorAll('#custom-marker a-text, #custom-marker a-image');
+          
+          arContent.forEach(element => {
+            // Плавно меняем прозрачность
+            if (isVisible) {
+              element.setAttribute('animation', {
+                property: 'material.opacity',
+                from: 0,
+                to: 1,
+                dur: 500,
+                easing: 'easeOutQuad'
+              });
+            } else {
+              element.setAttribute('animation', {
+                property: 'material.opacity',
+                from: 1,
+                to: 0,
+                dur: 300,
+                easing: 'easeInQuad'
+              });
+            }
+          });
+          
+          // Управление аудио
+          const audioElement = document.querySelector('#belarus-audio');
+          if (audioElement) {
+            if (isVisible && !markerVisible) {
+              audioElement.components.sound.playSound();
+            } else if (!isVisible && markerVisible) {
+              audioElement.components.sound.pauseSound();
+            }
+          }
+          
+          markerVisible = isVisible;
+        }
+
+        // Отладка маркеров с фильтрацией "дрожания"
         if (customMarker) {
+          // Счетчик стабильности для предотвращения ложных срабатываний
+          let lostCounter = 0;
+          const lostThreshold = 5; // Сколько кадров пропустить прежде чем считать маркер потерянным
+          
           customMarker.addEventListener('markerFound', function() {
-            debug.innerHTML += "<span style='color:lime'>Кастомный маркер найден!</span><br>";
+            stabilityCounter++;
+            
+            if (stabilityCounter === 1) {
+              stabilizing.style.display = 'block';
+              stabilizing.textContent = 'Стабилизация маркера...';
+            }
+            
+            if (stabilityCounter >= requiredStability && !markerVisible) {
+              debug.innerHTML = "Маркер стабилизирован<br>";
+              debug.innerHTML += "AR контент активирован<br>";
+              stabilizing.style.display = 'none';
+              toggleARContent(true);
+              lostCounter = 0;
+            }
           });
           
           customMarker.addEventListener('markerLost', function() {
-            debug.innerHTML += "<span style='color:orange'>Кастомный маркер потерян</span><br>";
+            lostCounter++;
+            
+            if (lostCounter >= lostThreshold) {
+              stabilityCounter = 0;
+              if (markerVisible) {
+                debug.innerHTML = "Маркер потерян<br>";
+                debug.innerHTML += "Поиск маркера...<br>";
+                toggleARContent(false);
+              }
+              stabilizing.style.display = 'none';
+            }
           });
         } else {
-          debug.innerHTML += "<span style='color:red'>Кастомный маркер не инициализирован</span><br>";
-        }
-        
-        if (hiroMarker) {
-          hiroMarker.addEventListener('markerFound', function() {
-            debug.innerHTML += "<span style='color:lime'>Маркер Hiro найден!</span><br>";
-          });
-          
-          hiroMarker.addEventListener('markerLost', function() {
-            debug.innerHTML += "<span style='color:orange'>Маркер Hiro потерян</span><br>";
-          });
-        } else {
-          debug.innerHTML += "<span style='color:red'>Маркер Hiro не инициализирован</span><br>";
+          debug.innerHTML = "Маркер не инициализирован<br>";
         }
       }
     </script>
@@ -110,6 +181,9 @@
       <div>Загрузка, пожалуйста подождите...</div>
     </div>
     
+    <!-- Стабилизация -->
+    <div id="stabilizing">Стабилизация маркера...</div>
+    
     <!-- Отладочная информация -->
     <div id="debug">Отладка AR:<br></div>
     <div id="version-info"></div>
@@ -117,7 +191,7 @@
     <a-scene 
       embedded 
       arjs="sourceType: webcam; 
-            debugUIEnabled: true; 
+            debugUIEnabled: false; 
             detectionMode: mono; 
             patternRatio: 0.75;
             cameraParametersUrl: https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat;
@@ -125,30 +199,47 @@
             canvasWidth: 640;
             canvasHeight: 480;">
       
-      <!-- Стандартный маркер Hiro для тестирования -->
-      <a-marker preset="hiro" emitevents="true" id="hiro-marker">
-        <a-box position="0 0.5 0" color="yellow" wireframe="true"></a-box>
+      <!-- Кастомный маркер с параметрами сглаживания -->
+      <a-marker 
+        type="pattern" 
+        url="marker.patt" 
+        emitevents="true" 
+        id="custom-marker"
+        smooth="true"
+        smoothCount="10" 
+        smoothTolerance="0.02"
+        smoothThreshold="5"
+        raycaster="objects: .clickable"
+        cursor="fuse: false">
+        
+        <!-- Текст в AR с нулевой начальной прозрачностью -->
         <a-text
-          value="Маркер Hiro"
-          color="blue"
-          position="0 0 0"
+          value="привет из IT Беларуси!"
+          color="white"
+          position="0 0.5 0"
           align="center"
           scale="0.5 0.5 0.5"
-          rotation="-90 0 0">
+          rotation="-90 0 0"
+          material="opacity: 0"
+          animation="property: material.opacity; from: 0; to: 0; dur: 1">
         </a-text>
-      </a-marker>
-      
-      <!-- Кастомный маркер -->
-      <a-marker type="pattern" url="marker.patt" emitevents="true" id="custom-marker">
-        <a-sphere position="0 0.5 0" radius="0.5" color="red" wireframe="true"></a-sphere>
-        <a-text
-          value="Ваш маркер"
-          color="red"
+        
+        <!-- Изображение в AR с нулевой начальной прозрачностью -->
+        <a-image
+          src="image.png"
           position="0 0 0"
-          align="center"
-          scale="0.5 0.5 0.5"
-          rotation="-90 0 0">
-        </a-text>
+          rotation="-90 0 0"
+          width="1"
+          height="1"
+          material="opacity: 0"
+          animation="property: material.opacity; from: 0; to: 0; dur: 1">
+        </a-image>
+        
+        <!-- Аудио -->
+        <a-entity
+          id="belarus-audio"
+          sound="src: https://raw.githubusercontent.com/aframevr/aframe/master/examples/basic/audio/click.ogg; autoplay: false; loop: true; volume: 0.5">
+        </a-entity>
       </a-marker>
       
       <!-- Камера -->
