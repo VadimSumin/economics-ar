@@ -39,6 +39,9 @@
         font-size: 14px;
         z-index: 9998;
         pointer-events: none;
+        max-height: 70vh;
+        overflow-y: auto;
+        width: 300px;
       }
       #version-info {
         position: fixed;
@@ -51,6 +54,33 @@
         font-size: 12px;
         z-index: 9997;
       }
+      #stabilizing {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        font-size: 18px;
+        z-index: 9990;
+        display: none;
+      }
+      .success {
+        color: lime;
+      }
+      .warning {
+        color: orange;
+      }
+      .error {
+        color: red;
+      }
+      .info {
+        color: cyan;
+      }
     </style>
     <script>
       window.onload = function() {
@@ -59,10 +89,30 @@
         const debug = document.getElementById('debug');
         const customMarker = document.querySelector('#custom-marker');
         const versionInfo = document.getElementById('version-info');
+        const stabilizing = document.getElementById('stabilizing');
         
         let markerVisible = false;
         let lostCounter = 0;
-        const lostThreshold = 10; // Увеличиваем до 10 промахов для исчезновения
+        const lostThreshold = 10; // 10 промахов для исчезновения
+        let stabilityCounter = 0;
+        const requiredStability = 5; // 5 кадров для полной стабилизации
+        let debugHistory = [];
+        const maxDebugEntries = 20;
+        
+        // Функция для добавления отладочных сообщений
+        function addDebugMessage(message, type = 'info') {
+          const timestamp = new Date().toLocaleTimeString();
+          const formattedMessage = `<span class="${type}">[${timestamp}] ${message}</span><br>`;
+          
+          debugHistory.push(formattedMessage);
+          // Ограничиваем историю сообщений
+          if (debugHistory.length > maxDebugEntries) {
+            debugHistory.shift();
+          }
+          
+          // Обновляем отображение
+          debug.innerHTML = debugHistory.join('');
+        }
         
         if (navigator.userAgent) {
           versionInfo.innerHTML = "Браузер: " + navigator.userAgent;
@@ -71,8 +121,8 @@
         if (scene && loader) {
           scene.addEventListener('loaded', function () {
             loader.style.display = 'none';
-            debug.innerHTML = "AR сцена загружена<br>";
-            debug.innerHTML += "Направьте камеру на маркер E-ECONOMY<br>";
+            addDebugMessage("AR сцена загружена", "success");
+            addDebugMessage("Направьте камеру на маркер E-ECONOMY");
           });
           
           setTimeout(function() {
@@ -110,8 +160,10 @@
           if (audioElement) {
             if (isVisible && !markerVisible) {
               audioElement.components.sound.playSound();
+              addDebugMessage("Аудио запущено", "info");
             } else if (!isVisible && markerVisible) {
               audioElement.components.sound.pauseSound();
+              addDebugMessage("Аудио приостановлено", "info");
             }
           }
           
@@ -120,35 +172,87 @@
 
         // Обработка событий маркера
         if (customMarker) {
+          let markerFoundCount = 0;
+          let markerLostCount = 0;
+          let isStabilizing = false;
+          
           customMarker.addEventListener('markerFound', function() {
-            // Сразу активируем при первом обнаружении
-            if (!markerVisible) {
-              debug.innerHTML = "Маркер найден!<br>";
-              debug.innerHTML += "AR контент активирован<br>";
+            markerFoundCount++;
+            stabilityCounter++;
+            
+            // Показываем индикатор стабилизации при первом обнаружении
+            if (!markerVisible && !isStabilizing) {
+              stabilizing.style.display = 'block';
+              stabilizing.innerHTML = 'Стабилизация маркера...';
+              isStabilizing = true;
+              
+              // Сразу активируем контент при первом обнаружении
+              addDebugMessage("Маркер найден! Стабилизация...", "success");
               toggleARContent(true);
             }
             
+            // Обновляем индикатор стабилизации
+            const percentage = Math.min(Math.round((stabilityCounter / requiredStability) * 100), 100);
+            stabilizing.innerHTML = `Стабилизация маркера: ${percentage}%`;
+            
+            // Когда достигнута полная стабильность
+            if (stabilityCounter >= requiredStability && isStabilizing) {
+              stabilizing.style.display = 'none';
+              isStabilizing = false;
+              addDebugMessage("Маркер полностью стабилизирован", "success");
+            }
+            
+            if (markerVisible && !isStabilizing) {
+              addDebugMessage("Маркер в поле зрения (найден " + markerFoundCount + " раз)", "info");
+            }
+            
             // Сбрасываем счетчик потерь
+            if (lostCounter > 0) {
+              addDebugMessage("Восстановление отслеживания", "info");
+            }
             lostCounter = 0;
           });
           
           customMarker.addEventListener('markerLost', function() {
             lostCounter++;
+            markerLostCount++;
+            
+            // Сбрасываем счетчик стабильности при потере
+            if (lostCounter >= 3) {
+              stabilityCounter = Math.max(0, stabilityCounter - 1);
+            }
             
             if (lostCounter === 1) {
-              debug.innerHTML = "Возможна потеря маркера<br>";
-              debug.innerHTML += "Удерживайте маркер в поле зрения<br>";
+              addDebugMessage("Возможна потеря маркера", "warning");
+              addDebugMessage("Удерживайте маркер в поле зрения", "warning");
             }
             
             // Только после 10 последовательных потерь отключаем контент
             if (lostCounter >= lostThreshold && markerVisible) {
-              debug.innerHTML = "Маркер потерян<br>";
-              debug.innerHTML += "Поиск маркера...<br>";
+              addDebugMessage("Маркер потерян (потерян " + markerLostCount + " раз)", "error");
+              addDebugMessage("Поиск маркера...", "info");
               toggleARContent(false);
+              stabilizing.style.display = 'none';
+              isStabilizing = false;
+              stabilityCounter = 0;
+            } else if (markerVisible) {
+              addDebugMessage("Временная потеря (" + lostCounter + "/" + lostThreshold + ")", "warning");
             }
           });
+          
+          // Добавляем периодический мониторинг состояния маркера
+          setInterval(function() {
+            if (markerVisible) {
+              const stabilityPercentage = Math.min(Math.round((stabilityCounter / requiredStability) * 100), 100);
+              const visibilityStatus = lostCounter > 0 ? 
+                "Нестабильно (" + lostCounter + "/" + lostThreshold + ")" : 
+                "Стабильно (" + stabilityPercentage + "%)";
+              versionInfo.innerHTML = "Статус: " + visibilityStatus + " | Найден: " + markerFoundCount + " | Потерян: " + markerLostCount;
+            }
+          }, 1000);
+          
         } else {
-          debug.innerHTML = "Маркер не инициализирован<br>";
+          addDebugMessage("Маркер не инициализирован", "error");
         }
       }
     </script>
@@ -159,6 +263,9 @@
       <div>Загрузка, пожалуйста подождите...</div>
     </div>
     
+    <!-- Индикатор стабилизации -->
+    <div id="stabilizing">Стабилизация маркера...</div>
+    
     <!-- Отладочная информация -->
     <div id="debug">Отладка AR:<br></div>
     <div id="version-info"></div>
@@ -166,24 +273,24 @@
     <a-scene 
       embedded 
       arjs="sourceType: webcam; 
-            debugUIEnabled: false; 
+            debugUIEnabled: true; 
             detectionMode: mono; 
             patternRatio: 0.75;
             cameraParametersUrl: https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat;
-            maxDetectionRate: 30;
+            maxDetectionRate: 60;
             canvasWidth: 640;
             canvasHeight: 480;">
       
-      <!-- Кастомный маркер с параметрами сглаживания -->
+      <!-- Кастомный маркер с улучшенными параметрами сглаживания -->
       <a-marker 
         type="pattern" 
         url="marker.patt" 
         emitevents="true" 
         id="custom-marker"
         smooth="true"
-        smoothCount="10" 
-        smoothTolerance="0.02"
-        smoothThreshold="5"
+        smoothCount="15" 
+        smoothTolerance="0.01"
+        smoothThreshold="2"
         raycaster="objects: .clickable"
         cursor="fuse: false">
         
