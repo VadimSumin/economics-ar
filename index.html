@@ -1,350 +1,248 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>AR Беларусь</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Используем более стабильную версию AR.js -->
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AR Беларусь (MindAR)</title>
+    
+    <!-- Подключение MindAR -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image.prod.js"></script>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    
     <style>
       body {
         margin: 0;
         overflow: hidden;
       }
-      .arjs-loader {
-        height: 100%;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        background-color: rgba(0, 0, 0, 0.8);
-        z-index: 9999;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .arjs-loader div {
-        text-align: center;
-        font-size: 1.25em;
-        color: white;
-      }
-      #debug {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background-color: rgba(0, 0, 0, 0.6);
-        color: white;
-        padding: 10px;
-        font-family: monospace;
-        font-size: 14px;
-        z-index: 9998;
-        pointer-events: none;
-        max-height: 70vh;
-        overflow-y: auto;
-        width: 300px;
-      }
-      #version-info {
+      .info-panel {
         position: fixed;
         bottom: 10px;
         left: 10px;
         background-color: rgba(0, 0, 0, 0.6);
         color: white;
-        padding: 5px;
-        font-family: monospace;
-        font-size: 12px;
-        z-index: 9997;
+        padding: 5px 10px;
+        font-family: Arial, sans-serif;
+        border-radius: 5px;
+        z-index: 100;
+        font-size: 14px;
       }
-      #stabilizing {
+      .loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
+      .loading-text {
+        text-align: center;
+      }
+      .loading-text h2 {
+        margin-bottom: 20px;
+      }
+      .loading-bar {
+        width: 250px;
+        height: 20px;
+        background-color: #333;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 0 auto;
+      }
+      .loading-bar-progress {
+        height: 100%;
+        background-color: #4CAF50;
+        width: 0%;
+        transition: width 0.3s;
+      }
+      .error-message {
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background-color: rgba(0, 0, 0, 0.7);
+        background-color: rgba(255, 0, 0, 0.7);
         color: white;
-        padding: 15px 25px;
+        padding: 20px;
         border-radius: 10px;
         font-family: Arial, sans-serif;
         text-align: center;
-        font-size: 18px;
-        z-index: 9990;
+        z-index: 10000;
         display: none;
-      }
-      .success {
-        color: lime;
-      }
-      .warning {
-        color: orange;
-      }
-      .error {
-        color: red;
-      }
-      .info {
-        color: cyan;
+        max-width: 80%;
       }
     </style>
-    <script>
-      window.onload = function() {
-        const scene = document.querySelector('a-scene');
-        const loader = document.querySelector('.arjs-loader');
-        const debug = document.getElementById('debug');
-        const customMarker = document.querySelector('#custom-marker');
-        const versionInfo = document.getElementById('version-info');
-        const stabilizing = document.getElementById('stabilizing');
-        
-        let markerVisible = false;
-        let lostCounter = 0;
-        const lostThreshold = 15; // Увеличиваем до 15 промахов для исчезновения
-        let stabilityCounter = 0;
-        const requiredStability = 3; // Уменьшаем до 3 кадров для полной стабилизации
-        let debugHistory = [];
-        const maxDebugEntries = 20;
-        
-        // Функция для добавления отладочных сообщений
-        function addDebugMessage(message, type = 'info') {
-          const timestamp = new Date().toLocaleTimeString();
-          const formattedMessage = `<span class="${type}">[${timestamp}] ${message}</span><br>`;
-          
-          debugHistory.push(formattedMessage);
-          // Ограничиваем историю сообщений
-          if (debugHistory.length > maxDebugEntries) {
-            debugHistory.shift();
-          }
-          
-          // Обновляем отображение
-          debug.innerHTML = debugHistory.join('');
-        }
-        
-        if (navigator.userAgent) {
-          versionInfo.innerHTML = "Браузер: " + navigator.userAgent;
-        }
-        
-        if (scene && loader) {
-          scene.addEventListener('loaded', function () {
-            loader.style.display = 'none';
-            addDebugMessage("AR сцена загружена", "success");
-            addDebugMessage("Направьте камеру на маркер E-ECONOMY");
-          });
-          
-          setTimeout(function() {
-            loader.style.display = 'none';
-          }, 3000);
-        }
-
-        // Функция для сглаженного включения/выключения AR контента
-        function toggleARContent(isVisible) {
-          const arContent = document.querySelectorAll('#custom-marker a-text, #custom-marker a-image');
-          
-          arContent.forEach(element => {
-            // Плавно меняем прозрачность
-            if (isVisible) {
-              element.setAttribute('animation', {
-                property: 'material.opacity',
-                from: 0,
-                to: 1,
-                dur: 500,
-                easing: 'easeOutQuad'
-              });
-            } else {
-              element.setAttribute('animation', {
-                property: 'material.opacity',
-                from: 1,
-                to: 0,
-                dur: 300,
-                easing: 'easeInQuad'
-              });
-            }
-          });
-          
-          // Управление аудио
-          const audioElement = document.querySelector('#belarus-audio');
-          if (audioElement) {
-            if (isVisible && !markerVisible) {
-              audioElement.components.sound.playSound();
-              addDebugMessage("Аудио запущено", "info");
-            } else if (!isVisible && markerVisible) {
-              audioElement.components.sound.pauseSound();
-              addDebugMessage("Аудио приостановлено", "info");
-            }
-          }
-          
-          markerVisible = isVisible;
-        }
-
-        // Обработка событий маркера с гистерезисом
-        if (customMarker) {
-          let markerFoundCount = 0;
-          let markerLostCount = 0;
-          let isStabilizing = false;
-          let consecutiveFoundFrames = 0;
-          let consecutiveLostFrames = 0;
-          
-          // Функция для обработки обнаружения маркера с фильтрацией дрожания
-          customMarker.addEventListener('markerFound', function() {
-            markerFoundCount++;
-            consecutiveFoundFrames++;
-            consecutiveLostFrames = 0;
-            
-            // Быстрее наращиваем стабильность
-            stabilityCounter = Math.min(stabilityCounter + 1, requiredStability + 2);
-            
-            // Показываем индикатор стабилизации при первом обнаружении
-            if (!markerVisible && !isStabilizing) {
-              stabilizing.style.display = 'block';
-              stabilizing.innerHTML = 'Стабилизация маркера...';
-              isStabilizing = true;
-              
-              // Сразу активируем контент при первом обнаружении
-              addDebugMessage("Маркер найден! Стабилизация...", "success");
-              toggleARContent(true);
-            }
-            
-            // Обновляем индикатор стабилизации
-            const percentage = Math.min(Math.round((stabilityCounter / requiredStability) * 100), 100);
-            stabilizing.innerHTML = `Стабилизация маркера: ${percentage}%`;
-            
-            // Когда достигнута полная стабильность
-            if (stabilityCounter >= requiredStability && isStabilizing) {
-              stabilizing.style.display = 'none';
-              isStabilizing = false;
-              addDebugMessage("Маркер полностью стабилизирован", "success");
-            }
-            
-            if (markerVisible && !isStabilizing && consecutiveFoundFrames > 5) {
-              // Ограничиваем сообщения, чтобы не спамить
-              if (consecutiveFoundFrames % 10 === 0) {
-                addDebugMessage("Маркер в поле зрения (найден " + markerFoundCount + " раз)", "info");
-              }
-            }
-            
-            // Сбрасываем счетчик потерь
-            if (lostCounter > 0) {
-              addDebugMessage("Восстановление отслеживания", "info");
-            }
-            lostCounter = 0;
-          });
-          
-          // Функция для обработки потери маркера с фильтрацией дрожания
-          customMarker.addEventListener('markerLost', function() {
-            consecutiveLostFrames++;
-            consecutiveFoundFrames = 0;
-            
-            // Увеличиваем счетчик потерь только если несколько кадров подряд маркер не найден
-            // Это предотвращает ложные срабатывания при кратковременной потере
-            if (consecutiveLostFrames >= 2) {
-              lostCounter++;
-              markerLostCount++;
-            }
-            
-            // Медленнее уменьшаем стабильность
-            if (lostCounter >= 3 && lostCounter % 2 === 0) {
-              stabilityCounter = Math.max(0, stabilityCounter - 1);
-            }
-            
-            // Уведомляем только о значимых потерях маркера
-            if (lostCounter === 1) {
-              addDebugMessage("Возможна потеря маркера", "warning");
-              addDebugMessage("Удерживайте маркер в поле зрения", "warning");
-            }
-            
-            // Только после большого числа последовательных потерь отключаем контент
-            if (lostCounter >= lostThreshold && markerVisible) {
-              addDebugMessage("Маркер потерян (потерян " + markerLostCount + " раз)", "error");
-              addDebugMessage("Поиск маркера...", "info");
-              toggleARContent(false);
-              stabilizing.style.display = 'none';
-              isStabilizing = false;
-              stabilityCounter = 0;
-            } else if (markerVisible && lostCounter % 5 === 0) { // Уменьшаем количество сообщений
-              addDebugMessage("Временная потеря (" + lostCounter + "/" + lostThreshold + ")", "warning");
-            }
-          });
-          
-          // Добавляем периодический мониторинг состояния маркера
-          setInterval(function() {
-            if (markerVisible) {
-              const stabilityPercentage = Math.min(Math.round((stabilityCounter / requiredStability) * 100), 100);
-              const visibilityStatus = lostCounter > 0 ? 
-                "Нестабильно (" + lostCounter + "/" + lostThreshold + ")" : 
-                "Стабильно (" + stabilityPercentage + "%)";
-              versionInfo.innerHTML = "Статус: " + visibilityStatus + " | Найден: " + markerFoundCount + " | Потерян: " + markerLostCount;
-            }
-          }, 1000);
-          
-        } else {
-          addDebugMessage("Маркер не инициализирован", "error");
-        }
-      }
-    </script>
   </head>
   <body>
-    <!-- Загрузчик -->
-    <div class="arjs-loader">
-      <div>Загрузка, пожалуйста подождите...</div>
+    <!-- Индикатор загрузки -->
+    <div class="loading" id="loading">
+      <div class="loading-text">
+        <h2>Загрузка AR...</h2>
+        <div class="loading-bar">
+          <div class="loading-bar-progress" id="loading-bar-progress"></div>
+        </div>
+        <p id="loading-progress-text">0%</p>
+      </div>
+    </div>
+
+    <!-- Сообщение об ошибке -->
+    <div class="error-message" id="error-message">
+      Ошибка загрузки AR-контента. Пожалуйста, проверьте, что файл targets.mind доступен и ваш браузер поддерживает WebXR.
+    </div>
+
+    <div class="info-panel" id="info-panel">
+      Наведите камеру на изображение маркера
     </div>
     
-    <!-- Индикатор стабилизации -->
-    <div id="stabilizing">Стабилизация маркера...</div>
-    
-    <!-- Отладочная информация -->
-    <div id="debug">Отладка AR:<br></div>
-    <div id="version-info"></div>
-    
+    <!-- MindAR A-Frame сцена -->
     <a-scene 
-      embedded 
-      arjs="sourceType: webcam; 
-            debugUIEnabled: true; 
-            detectionMode: mono; 
-            patternRatio: 0.75;
-            cameraParametersUrl: https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat;
-            maxDetectionRate: 60;
-            canvasWidth: 640;
-            canvasHeight: 480;">
+      mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: false; uiScanning: true; uiError: true; maxTrack: 1;" 
+      color-space="sRGB" 
+      embedded
+      renderer="colorManagement: true, physicallyCorrectLights" 
+      vr-mode-ui="enabled: false">
       
-      <!-- Кастомный маркер с улучшенными параметрами сглаживания -->
-      <a-marker 
-        type="pattern" 
-        url="marker.patt" 
-        emitevents="true" 
-        id="custom-marker"
-        smooth="true"
-        smoothCount="20" 
-        smoothTolerance="0.005"
-        smoothThreshold="2"
-        raycaster="objects: .clickable"
-        cursor="fuse: false">
-        
-        <!-- Текст в AR с нулевой начальной прозрачностью -->
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      
+      <a-entity id="target" mindar-image-target="targetIndex: 0">
+        <!-- Текст в AR -->
         <a-text
           value="привет из IT Беларуси!"
           color="white"
           position="0 0.5 0"
           align="center"
           scale="0.5 0.5 0.5"
-          rotation="-90 0 0"
-          material="opacity: 0"
-          animation="property: material.opacity; from: 0; to: 0; dur: 1">
+          rotation="-90 0 0">
         </a-text>
         
-        <!-- Изображение в AR с нулевой начальной прозрачностью -->
-        <a-image
+        <!-- Изображение в AR -->
+        <a-plane
           src="image.png"
           position="0 0 0"
           rotation="-90 0 0"
           width="1"
-          height="1"
-          material="opacity: 0"
-          animation="property: material.opacity; from: 0; to: 0; dur: 1">
-        </a-image>
+          height="1">
+        </a-plane>
         
         <!-- Аудио -->
         <a-entity
           id="belarus-audio"
           sound="src: https://raw.githubusercontent.com/aframevr/aframe/master/examples/basic/audio/click.ogg; autoplay: false; loop: true; volume: 0.5">
         </a-entity>
-      </a-marker>
-      
-      <!-- Камера -->
-      <a-entity camera></a-entity>
+      </a-entity>
     </a-scene>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Элементы интерфейса
+        const loadingEl = document.getElementById('loading');
+        const loadingBarEl = document.getElementById('loading-bar-progress');
+        const loadingTextEl = document.getElementById('loading-progress-text');
+        const infoPanel = document.getElementById('info-panel');
+        const sceneEl = document.querySelector('a-scene');
+        const audioEl = document.getElementById('belarus-audio');
+        const errorMessage = document.getElementById('error-message');
+        
+        let isAudioPlaying = false;
+        let isTargetFound = false;
+        let loadTimeout = null;
+        
+        // Обработка события прогресса загрузки
+        if (window.MINDAR && window.MINDAR.IMAGE) {
+          const mindARLib = window.MINDAR.IMAGE;
+          if (mindARLib.MindARImageTarget && mindARLib.MindARImageTarget.prototype) {
+            mindARLib.MindARImageTarget.prototype.onProgress = (progress) => {
+              const percentage = Math.floor(progress * 100);
+              loadingBarEl.style.width = `${percentage}%`;
+              loadingTextEl.innerHTML = `${percentage}%`;
+              
+              // Сбрасываем таймер ожидания при каждом прогрессе
+              if (loadTimeout) {
+                clearTimeout(loadTimeout);
+              }
+              
+              if (percentage === 100) {
+                setTimeout(() => {
+                  loadingEl.style.display = 'none';
+                }, 1000);
+              }
+            };
+          }
+        }
+        
+        // Функция для отображения ошибки загрузки
+        function showError(message) {
+          loadingEl.style.display = 'none';
+          errorMessage.textContent = message || 'Ошибка загрузки AR. Проверьте файл targets.mind и поддержку WebXR в браузере.';
+          errorMessage.style.display = 'block';
+        }
+        
+        // Обработка событий сцены
+        sceneEl.addEventListener('loaded', function() {
+          console.log('A-Frame scene loaded');
+        });
+        
+        // Обработка ошибок
+        sceneEl.addEventListener('arError', function(event) {
+          console.error('AR error:', event);
+          showError('Ошибка инициализации AR: ' + (event.detail || 'Неизвестная ошибка'));
+        });
+        
+        // Скрыть загрузчик после загрузки сцены
+        sceneEl.addEventListener('renderstart', function() {
+          console.log('Render started');
+          // Загрузка успешна, скрываем загрузчик через 1 секунду
+          setTimeout(() => {
+            loadingEl.style.display = 'none';
+          }, 1000);
+        });
+        
+        // Таймаут загрузки - если через 20 секунд загрузка не завершена, показываем ошибку
+        loadTimeout = setTimeout(() => {
+          if (loadingEl.style.display !== 'none') {
+            showError('Превышено время ожидания загрузки. Проверьте, что файл targets.mind существует и доступен.');
+          }
+        }, 20000);
+        
+        // Обработка события обнаружения маркера
+        const target = document.getElementById('target');
+        target.addEventListener('targetFound', function() {
+          isTargetFound = true;
+          infoPanel.innerText = 'Маркер найден!';
+          console.log('Target found!');
+          
+          // Запустить аудио при первом обнаружении
+          if (!isAudioPlaying && audioEl.components && audioEl.components.sound) {
+            try {
+              audioEl.components.sound.playSound();
+              isAudioPlaying = true;
+            } catch (e) {
+              console.error('Error playing sound:', e);
+            }
+          }
+        });
+        
+        // Обработка события потери маркера
+        target.addEventListener('targetLost', function() {
+          isTargetFound = false;
+          infoPanel.innerText = 'Маркер потерян. Наведите камеру на изображение снова.';
+          console.log('Target lost!');
+          
+          // Приостановить аудио при потере маркера
+          if (isAudioPlaying && audioEl.components && audioEl.components.sound) {
+            try {
+              audioEl.components.sound.pauseSound();
+              isAudioPlaying = false;
+            } catch (e) {
+              console.error('Error pausing sound:', e);
+            }
+          }
+        });
+      });
+    </script>
   </body>
 </html> 
