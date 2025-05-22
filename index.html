@@ -93,9 +93,9 @@
         
         let markerVisible = false;
         let lostCounter = 0;
-        const lostThreshold = 10; // 10 промахов для исчезновения
+        const lostThreshold = 15; // Увеличиваем до 15 промахов для исчезновения
         let stabilityCounter = 0;
-        const requiredStability = 5; // 5 кадров для полной стабилизации
+        const requiredStability = 3; // Уменьшаем до 3 кадров для полной стабилизации
         let debugHistory = [];
         const maxDebugEntries = 20;
         
@@ -170,15 +170,22 @@
           markerVisible = isVisible;
         }
 
-        // Обработка событий маркера
+        // Обработка событий маркера с гистерезисом
         if (customMarker) {
           let markerFoundCount = 0;
           let markerLostCount = 0;
           let isStabilizing = false;
+          let consecutiveFoundFrames = 0;
+          let consecutiveLostFrames = 0;
           
+          // Функция для обработки обнаружения маркера с фильтрацией дрожания
           customMarker.addEventListener('markerFound', function() {
             markerFoundCount++;
-            stabilityCounter++;
+            consecutiveFoundFrames++;
+            consecutiveLostFrames = 0;
+            
+            // Быстрее наращиваем стабильность
+            stabilityCounter = Math.min(stabilityCounter + 1, requiredStability + 2);
             
             // Показываем индикатор стабилизации при первом обнаружении
             if (!markerVisible && !isStabilizing) {
@@ -202,8 +209,11 @@
               addDebugMessage("Маркер полностью стабилизирован", "success");
             }
             
-            if (markerVisible && !isStabilizing) {
-              addDebugMessage("Маркер в поле зрения (найден " + markerFoundCount + " раз)", "info");
+            if (markerVisible && !isStabilizing && consecutiveFoundFrames > 5) {
+              // Ограничиваем сообщения, чтобы не спамить
+              if (consecutiveFoundFrames % 10 === 0) {
+                addDebugMessage("Маркер в поле зрения (найден " + markerFoundCount + " раз)", "info");
+              }
             }
             
             // Сбрасываем счетчик потерь
@@ -213,21 +223,30 @@
             lostCounter = 0;
           });
           
+          // Функция для обработки потери маркера с фильтрацией дрожания
           customMarker.addEventListener('markerLost', function() {
-            lostCounter++;
-            markerLostCount++;
+            consecutiveLostFrames++;
+            consecutiveFoundFrames = 0;
             
-            // Сбрасываем счетчик стабильности при потере
-            if (lostCounter >= 3) {
+            // Увеличиваем счетчик потерь только если несколько кадров подряд маркер не найден
+            // Это предотвращает ложные срабатывания при кратковременной потере
+            if (consecutiveLostFrames >= 2) {
+              lostCounter++;
+              markerLostCount++;
+            }
+            
+            // Медленнее уменьшаем стабильность
+            if (lostCounter >= 3 && lostCounter % 2 === 0) {
               stabilityCounter = Math.max(0, stabilityCounter - 1);
             }
             
+            // Уведомляем только о значимых потерях маркера
             if (lostCounter === 1) {
               addDebugMessage("Возможна потеря маркера", "warning");
               addDebugMessage("Удерживайте маркер в поле зрения", "warning");
             }
             
-            // Только после 10 последовательных потерь отключаем контент
+            // Только после большого числа последовательных потерь отключаем контент
             if (lostCounter >= lostThreshold && markerVisible) {
               addDebugMessage("Маркер потерян (потерян " + markerLostCount + " раз)", "error");
               addDebugMessage("Поиск маркера...", "info");
@@ -235,7 +254,7 @@
               stabilizing.style.display = 'none';
               isStabilizing = false;
               stabilityCounter = 0;
-            } else if (markerVisible) {
+            } else if (markerVisible && lostCounter % 5 === 0) { // Уменьшаем количество сообщений
               addDebugMessage("Временная потеря (" + lostCounter + "/" + lostThreshold + ")", "warning");
             }
           });
@@ -288,8 +307,8 @@
         emitevents="true" 
         id="custom-marker"
         smooth="true"
-        smoothCount="15" 
-        smoothTolerance="0.01"
+        smoothCount="20" 
+        smoothTolerance="0.005"
         smoothThreshold="2"
         raycaster="objects: .clickable"
         cursor="fuse: false">
