@@ -13,7 +13,7 @@
     </style>
   </head>
   <body>
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
       <!-- Текст в AR -->
       <a-text
         value="привет из IT Беларуси!"
@@ -42,7 +42,7 @@
       </a-sound>
 
       <!-- Маркер для AR -->
-      <a-marker-camera preset="hiro"></a-marker-camera>
+      <a-marker-camera preset="hiro" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="5"></a-marker-camera>
     </a-scene>
   </body>
 </html> 
