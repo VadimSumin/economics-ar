@@ -28,6 +28,24 @@
         color: white;
       }
     </style>
+    <script>
+      // Функция для скрытия загрузчика после инициализации AR
+      window.onload = function() {
+        const scene = document.querySelector('a-scene');
+        const loader = document.querySelector('.arjs-loader');
+        
+        if (scene && loader) {
+          scene.addEventListener('loaded', function () {
+            loader.style.display = 'none';
+          });
+          
+          // Резервный таймер на случай, если событие loaded не сработает
+          setTimeout(function() {
+            loader.style.display = 'none';
+          }, 3000);
+        }
+      }
+    </script>
   </head>
   <body>
     <!-- Загрузчик -->
