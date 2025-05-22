@@ -12,7 +12,18 @@
     <style>
       body {
         margin: 0;
+        padding: 0;
         overflow: hidden;
+        width: 100%;
+        height: 100%;
+      }
+      .a-canvas {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 1 !important;
       }
       .info-panel {
         position: fixed;
@@ -75,6 +86,33 @@
         display: none;
         max-width: 80%;
       }
+      .ar-image-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 50;
+        display: none;
+        text-align: center;
+        pointer-events: none;
+      }
+      .ar-image {
+        max-width: 80vw;
+        max-height: 60vh;
+        width: auto;
+        height: auto;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+      }
+      .ar-text {
+        color: white;
+        font-size: 24px;
+        font-family: Arial, sans-serif;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        margin-top: 20px;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+      }
     </style>
   </head>
   <body>
@@ -94,8 +132,15 @@
       Ошибка загрузки AR-контента. Пожалуйста, проверьте, что файл targets.mind доступен и ваш браузер поддерживает WebXR.
     </div>
 
+    <!-- Панель с информацией -->
     <div class="info-panel" id="info-panel">
       Наведите камеру на изображение маркера
+    </div>
+    
+    <!-- Контейнер для отображения изображения поверх AR -->
+    <div class="ar-image-container" id="ar-image-container">
+      <div class="ar-text" id="ar-text">привет из IT Беларуси!</div>
+      <img src="image.png" class="ar-image" id="ar-image" alt="AR изображение">
     </div>
     
     <!-- MindAR A-Frame сцена -->
@@ -103,31 +148,12 @@
       mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: false; uiScanning: true; uiError: true; maxTrack: 1;" 
       color-space="sRGB" 
       embedded
-      renderer="colorManagement: true, physicallyCorrectLights" 
+      renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;" 
       vr-mode-ui="enabled: false">
       
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
       
       <a-entity id="target" mindar-image-target="targetIndex: 0">
-        <!-- Текст в AR -->
-        <a-text
-          value="привет из IT Беларуси!"
-          color="white"
-          position="0 0.5 0"
-          align="center"
-          scale="0.5 0.5 0.5"
-          rotation="-90 0 0">
-        </a-text>
-        
-        <!-- Изображение в AR -->
-        <a-plane
-          src="image.png"
-          position="0 0 0"
-          rotation="-90 0 0"
-          width="1"
-          height="1">
-        </a-plane>
-        
         <!-- Аудио -->
         <a-entity
           id="belarus-audio"
@@ -146,10 +172,17 @@
         const sceneEl = document.querySelector('a-scene');
         const audioEl = document.getElementById('belarus-audio');
         const errorMessage = document.getElementById('error-message');
+        const arImageContainer = document.getElementById('ar-image-container');
+        const arImage = document.getElementById('ar-image');
+        const arText = document.getElementById('ar-text');
         
         let isAudioPlaying = false;
         let isTargetFound = false;
         let loadTimeout = null;
+        
+        // Предзагрузка изображения
+        const img = new Image();
+        img.src = 'image.png';
         
         // Обработка события прогресса загрузки
         if (window.MINDAR && window.MINDAR.IMAGE) {
@@ -179,6 +212,23 @@
           loadingEl.style.display = 'none';
           errorMessage.textContent = message || 'Ошибка загрузки AR. Проверьте файл targets.mind и поддержку WebXR в браузере.';
           errorMessage.style.display = 'block';
+        }
+        
+        // Функция для отображения/скрытия AR-контента
+        function toggleARContent(visible) {
+          if (visible) {
+            arImageContainer.style.display = 'block';
+            setTimeout(() => {
+              arImage.style.opacity = '1';
+              arText.style.opacity = '1';
+            }, 100);
+          } else {
+            arImage.style.opacity = '0';
+            arText.style.opacity = '0';
+            setTimeout(() => {
+              arImageContainer.style.display = 'none';
+            }, 500);
+          }
         }
         
         // Обработка событий сцены
@@ -215,6 +265,9 @@
           infoPanel.innerText = 'Маркер найден!';
           console.log('Target found!');
           
+          // Показываем AR-контент
+          toggleARContent(true);
+          
           // Запустить аудио при первом обнаружении
           if (!isAudioPlaying && audioEl.components && audioEl.components.sound) {
             try {
@@ -232,6 +285,9 @@
           infoPanel.innerText = 'Маркер потерян. Наведите камеру на изображение снова.';
           console.log('Target lost!');
           
+          // Скрываем AR-контент
+          toggleARContent(false);
+          
           // Приостановить аудио при потере маркера
           if (isAudioPlaying && audioEl.components && audioEl.components.sound) {
             try {
@@ -240,6 +296,15 @@
             } catch (e) {
               console.error('Error pausing sound:', e);
             }
+          }
+        });
+        
+        // Подстройка размера изображения при изменении размера окна
+        window.addEventListener('resize', function() {
+          if (isTargetFound) {
+            // Обновляем стили для адаптивности
+            arImage.style.maxWidth = '80vw';
+            arImage.style.maxHeight = '60vh';
           }
         });
       });
