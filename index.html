@@ -41,8 +41,16 @@
         position="0 0 0">
       </a-sound>
 
-      <!-- Маркер для AR -->
-      <a-marker-camera preset="hiro" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="5"></a-marker-camera>
+      <!-- Маркер для AR (QR код) -->
+      <a-marker-camera 
+        type="pattern" 
+        preset="custom" 
+        url="marker.png"
+        smooth="true" 
+        smoothCount="5" 
+        smoothTolerance="0.01" 
+        smoothThreshold="5">
+      </a-marker-camera>
     </a-scene>
   </body>
 </html> 
