@@ -51,20 +51,6 @@
         font-size: 12px;
         z-index: 9997;
       }
-      #stabilizing {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 15px;
-        border-radius: 10px;
-        font-family: Arial, sans-serif;
-        text-align: center;
-        display: none;
-        z-index: 9990;
-      }
     </style>
     <script>
       window.onload = function() {
@@ -73,11 +59,10 @@
         const debug = document.getElementById('debug');
         const customMarker = document.querySelector('#custom-marker');
         const versionInfo = document.getElementById('version-info');
-        const stabilizing = document.getElementById('stabilizing');
         
         let markerVisible = false;
-        let stabilityCounter = 0;
-        const requiredStability = 10; // Сколько кадров подряд маркер должен быть виден
+        let lostCounter = 0;
+        const lostThreshold = 10; // Увеличиваем до 10 промахов для исчезновения
         
         if (navigator.userAgent) {
           versionInfo.innerHTML = "Браузер: " + navigator.userAgent;
@@ -133,40 +118,33 @@
           markerVisible = isVisible;
         }
 
-        // Отладка маркеров с фильтрацией "дрожания"
+        // Обработка событий маркера
         if (customMarker) {
-          // Счетчик стабильности для предотвращения ложных срабатываний
-          let lostCounter = 0;
-          const lostThreshold = 5; // Сколько кадров пропустить прежде чем считать маркер потерянным
-          
           customMarker.addEventListener('markerFound', function() {
-            stabilityCounter++;
-            
-            if (stabilityCounter === 1) {
-              stabilizing.style.display = 'block';
-              stabilizing.textContent = 'Стабилизация маркера...';
-            }
-            
-            if (stabilityCounter >= requiredStability && !markerVisible) {
-              debug.innerHTML = "Маркер стабилизирован<br>";
+            // Сразу активируем при первом обнаружении
+            if (!markerVisible) {
+              debug.innerHTML = "Маркер найден!<br>";
               debug.innerHTML += "AR контент активирован<br>";
-              stabilizing.style.display = 'none';
               toggleARContent(true);
-              lostCounter = 0;
             }
+            
+            // Сбрасываем счетчик потерь
+            lostCounter = 0;
           });
           
           customMarker.addEventListener('markerLost', function() {
             lostCounter++;
             
-            if (lostCounter >= lostThreshold) {
-              stabilityCounter = 0;
-              if (markerVisible) {
-                debug.innerHTML = "Маркер потерян<br>";
-                debug.innerHTML += "Поиск маркера...<br>";
-                toggleARContent(false);
-              }
-              stabilizing.style.display = 'none';
+            if (lostCounter === 1) {
+              debug.innerHTML = "Возможна потеря маркера<br>";
+              debug.innerHTML += "Удерживайте маркер в поле зрения<br>";
+            }
+            
+            // Только после 10 последовательных потерь отключаем контент
+            if (lostCounter >= lostThreshold && markerVisible) {
+              debug.innerHTML = "Маркер потерян<br>";
+              debug.innerHTML += "Поиск маркера...<br>";
+              toggleARContent(false);
             }
           });
         } else {
@@ -180,9 +158,6 @@
     <div class="arjs-loader">
       <div>Загрузка, пожалуйста подождите...</div>
     </div>
-    
-    <!-- Стабилизация -->
-    <div id="stabilizing">Стабилизация маркера...</div>
     
     <!-- Отладочная информация -->
     <div id="debug">Отладка AR:<br></div>
